@@ -89,13 +89,22 @@ body[data-view=today] [href="#today"],body[data-view=plan] [href="#plan"],body[d
 Start: 2026-10-12     (a Monday)
 Weeks: 12
 
-Mon: Upper Strength    weekly pattern
-Tue: Easy Run + Core   "+" = several workouts
-Sun: Rest
-Week 4 Sat: Rest       override one day of one week
-2026-12-25: Rest       override one date
+## Week 1             one block per week
+Mon: Upper Strength
+Tue: Easy Run + Core  "+" = several workouts
+Wed: Rest
+(Thu-Sun lines...)
 
-# Upper Strength       a workout; each line below is a part:
+## Week 2
+Mon: Lower Strength
+...
+Week 5: Rest          whole week off (one line)
+
+Mon: Easy Run         lines before any "Week" block = default for
+                      every week; Week blocks override them
+2026-12-25: Rest      override one date
+
+# Upper Strength      a workout; each line below is a part:
 Bench Press | 4 x 6 | optional note</pre>
   </section>
 </main>
@@ -109,17 +118,24 @@ const iso = d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0
 const add = (s, n) => { const d = new Date(s + 'T12:00'); d.setDate(d.getDate() + n); return iso(d) };
 const esc = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
 const monday = () => { const d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return iso(d) };
+const SEED_WEEKS = [ // one row per week, Mon..Sun
+  ['Upper Strength','Easy Run','Lower Strength','Intervals','Mobility','Long Run','Rest'],
+  ['Upper Strength','Easy Run','Lower Strength','Intervals','Mobility','Long Run','Rest'],
+  ['Upper Strength','Easy Run','Lower Strength','Tempo Run','Mobility','Long Run','Rest'],
+  ['Upper Strength','Easy Run','Mobility','Rest','Lower Strength','Easy Run','Rest'],
+  ['Upper Strength','Easy Run','Lower Strength','Tempo Run','Mobility','Long Run','Rest'],
+  ['Upper Strength','Easy Run + Core','Lower Strength','Intervals','Rest','Long Run','Mobility'],
+  ['Upper Strength','Easy Run','Lower Strength','Tempo Run','Mobility','Long Run Peak','Rest'],
+  ['Upper Strength','Easy Run','Mobility','Rest','Lower Strength','Easy Run','Rest'],
+  ['Upper Strength','Easy Run','Lower Strength','Intervals','Mobility','Long Run Peak','Rest'],
+  ['Upper Strength','Easy Run + Core','Lower Strength','Tempo Run','Rest','Long Run Peak','Mobility'],
+  ['Upper Strength','Easy Run','Lower Strength','Intervals','Mobility','Long Run','Rest'],
+  ['Easy Run','Mobility','Intervals','Rest','Easy Run','Rest','Race Day']];
 const SEED = () => `Plan: 12-Week Training Plan
 Start: ${monday()}
 Weeks: 12
 
-Mon: Upper Strength
-Tue: Easy Run
-Wed: Lower Strength
-Thu: Intervals
-Fri: Mobility
-Sat: Long Run
-Sun: Rest
+` + SEED_WEEKS.map((w, i) => `## Week ${i + 1}\n` + w.map((x, d) => `${DAYS[d][0].toUpperCase() + DAYS[d].slice(1)}: ${x}`).join('\n')).join('\n\n') + `
 
 # Upper Strength
 Warm-up | 5 min easy cardio + arm circles
@@ -150,6 +166,24 @@ Cool-down | 10 min easy jog
 Run | 60 min steady | Start slow, bring water
 Stretch | 10 min full body
 
+# Tempo Run
+Warm-up | 10 min easy jog
+Tempo | 20 min comfortably hard | Half-marathon effort
+Cool-down | 10 min easy jog
+
+# Long Run Peak
+Run | 90 min steady | Fuel every 30 min
+Stretch | 10 min full body
+
+# Core
+Plank | 3 x 45 sec
+Side plank | 2 x 30 sec each side
+Dead bug | 3 x 10
+
+# Race Day
+Warm-up | 15 min easy jog + strides
+Race | Go out controlled, finish strong | Trust the training
+
 # Mobility
 Hip openers | 2 x 10 each side
 Thoracic rotations | 2 x 10
@@ -160,15 +194,17 @@ let text = store('text') || SEED(), done = JSON.parse(store('done') || '{}'), P,
 
 function parse(t) {
   const p = { meta: {}, rules: [], W: {} };
-  let cur;
+  let cur, week = 0;
   for (let l of t.split('\n')) {
     l = l.trim();
     if (!l) continue;
-    if (l[0] == '#') { cur = p.W[l.slice(1).trim().toLowerCase()] = { name: l.slice(1).trim(), parts: [] }; continue }
+    const wh = l.match(/^(?:#+\s*)?week\s*(\d+)\s*:?$/i);
+    if (wh && !cur) { week = wh[1]; continue }
+    if (l[0] == '#') { week = 0; cur = p.W[l.slice(1).trim().toLowerCase()] = { name: l.slice(1).trim(), parts: [] }; continue }
     if (cur) { const [n, d, x] = l.split('|').map(s => s.trim()); cur.parts.push({ n, d: d || '', x: x || '' }); continue }
     const m = l.match(/^([^:]+):\s*(.*)$/); if (!m) continue;
     const k = m[1].trim().toLowerCase();
-    if (['plan', 'start', 'weeks'].includes(k)) p.meta[k] = m[2]; else p.rules.push([k, m[2]]);
+    if (['plan', 'start', 'weeks'].includes(k)) p.meta[k] = m[2]; else p.rules.push([week && DAYS.includes(k.slice(0, 3)) ? `week ${week} ${k}` : k, m[2]]);
   }
   const start = p.meta.start, n = +p.meta.weeks || 12, s = {};
   const names = v => /^rest$/i.test(v.trim()) ? [] : v.split('+').map(x => x.trim()).filter(Boolean);
@@ -176,6 +212,7 @@ function parse(t) {
   for (const [k, v] of [...p.rules].sort((a, b) => kind(a[0]) - kind(b[0]))) {
     const m = k.match(/^(?:week\s*(\d+)\s+)?(mon|tue|wed|thu|fri|sat|sun)/), i = m ? DAYS.indexOf(m[2]) : -1;
     if (kind(k) == 2) s[k] = names(v);
+    else if (/^week\s*\d+$/.test(k)) DAYS.forEach((_, j) => s[add(start, (k.match(/\d+/)[0] - 1) * 7 + j)] = names(v));
     else if (i < 0) continue;
     else if (m[1]) s[add(start, (m[1] - 1) * 7 + i)] = names(v);
     else for (let w = 0; w < n; w++) s[add(start, w * 7 + i)] = names(v);
