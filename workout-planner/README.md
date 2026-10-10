@@ -1,12 +1,16 @@
 # Workout Planner (PWA)
 
-Offline-capable app to schedule and track a training plan. No build step.
+A single `index.html` (HTML + CSS theme variables + ~100 lines of JS) plus a manifest, service worker and icons.
 
-Run: `cd workout-planner && python3 -m http.server 8000`, open http://localhost:8000 (service workers need localhost or HTTPS), then "Install" / "Add to Home Screen".
+## Put it on your phone
+Host the folder anywhere over HTTPS (e.g. GitHub Pages, Netlify), open the URL on your phone, then **Add to Home Screen**. It works offline after the first load. Locally: `python3 -m http.server` in this folder and open http://localhost:8000.
 
-- **Today**: opens on today's workout, plus the next one. *Focus* gives a large, phone-friendly view (step through parts, timers, A−/A+ text size, swipe, screen stays awake).
-- **Plan**: week-by-week calendar; tap a day to add/remove/reorder/move workouts. Generate a plan from a weekly pattern (e.g. 12 weeks).
-- **Workouts**: create/edit workouts made of multiple parts (details, notes, optional timer).
-- **More**: rename plan, export/import JSON backup, reset to sample plan.
+## Use
+- **Today** – opens on today's workout, with the next one below. Tick off parts as you go. **Focus** opens a full-screen, large-text view (A−/A+ to resize, screen stays awake, current part highlighted).
+- **Plan** – every week of the plan; tap a day to open it in focus view.
+- **Edit** – the whole plan is plain text (format shown on that page): weekly pattern, per-week/per-date overrides, and workouts made of parts. Also a theme picker.
 
-Data is stored in the browser's localStorage.
+## Theming
+All colors live in CSS variables at the top of `index.html`; add a `[data-theme=name]` block (and an `<option>`) for your own.
+
+Data is stored in the browser's localStorage on that device.

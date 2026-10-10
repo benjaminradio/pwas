@@ -3,25 +3,254 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Workout Planner</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="style.css">
+<script>try{document.documentElement.dataset.theme=localStorage.theme||''}catch(e){}</script>
+<style>
+/* ===== THEMES: change these variables (or add your own [data-theme] block) ===== */
+:root{--bg:#f1f5f9;--card:#fff;--fg:#0f172a;--mute:#64748b;--acc:#0284c7;--on-acc:#fff;--ok:#16a34a;--line:#cbd5e1;--radius:14px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--fg:#f1f5f9;--mute:#94a3b8;--acc:#38bdf8;--on-acc:#04202e;--ok:#22c55e;--line:#334155}}
+[data-theme=light]{--bg:#f1f5f9;--card:#fff;--fg:#0f172a;--mute:#64748b;--acc:#0284c7;--on-acc:#fff;--ok:#16a34a;--line:#cbd5e1}
+[data-theme=dark]{--bg:#0f172a;--card:#1e293b;--fg:#f1f5f9;--mute:#94a3b8;--acc:#38bdf8;--on-acc:#04202e;--ok:#22c55e;--line:#334155}
+[data-theme=black]{--bg:#000;--card:#111;--fg:#fff;--mute:#aaa;--acc:#ffd60a;--on-acc:#000;--ok:#30d158;--line:#333}
+[data-theme=forest]{--bg:#14231a;--card:#1d3326;--fg:#ecfdf3;--mute:#9fc4ae;--acc:#86efac;--on-acc:#052e16;--ok:#4ade80;--line:#2f5a41}
+[data-theme=sunset]{--bg:#fff7ed;--card:#fff;--fg:#431407;--mute:#9a6b52;--acc:#ea580c;--on-acc:#fff;--ok:#15803d;--line:#fed7aa}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 var(--font);padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+main{max-width:720px;margin:0 auto;padding:16px;padding-top:calc(16px + env(safe-area-inset-top))}
+section{display:none}
+body[data-view=today] #today,body[data-view=plan] #plan,body[data-view=edit] #edit{display:block}
+h1{font-size:1.5rem;margin:0}
+h2{font-size:.85rem;margin:22px 0 8px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.sub{color:var(--mute);margin:2px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card.now{border-color:var(--acc);border-width:2px}
+.card.fin{opacity:.65}
+.card h3{margin:0;display:flex;justify-content:space-between;gap:8px}
+.tag{font-size:.75rem;padding:2px 9px;border-radius:99px;background:var(--line);color:var(--mute);align-self:center}
+.tag.ok{background:var(--ok);color:#fff}
+ul{list-style:none;padding:0;margin:10px 0 0}
+li{border-top:1px solid var(--line)}
+li label{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;padding:10px 0;cursor:pointer}
+li input{grid-row:span 3;width:1.5em;height:1.5em;margin:2px 0 0;accent-color:var(--ok)}
+li .n{font-weight:700}li .d{color:var(--mute)}li .x{color:var(--mute);font-size:.9em;font-style:italic}
+li:has(input:checked) .n{text-decoration:line-through;color:var(--mute)}
+button,select{font:inherit;font-weight:600;border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--card);color:var(--fg)}
+button.pri{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+.week summary{cursor:pointer;font-weight:700;padding:8px 0}
+.day{display:flex;gap:12px;padding:10px 12px;border:1px solid var(--line);background:var(--card);border-radius:10px;margin-bottom:6px;width:100%;text-align:left}
+.day.today{border-color:var(--acc);border-width:2px}
+.day b{width:3.2em;flex:none}.day span{flex:1}.day.fin{opacity:.6}
+.empty{text-align:center;color:var(--mute);padding:24px 0}
+textarea{width:100%;height:55vh;font:14px/1.45 ui-monospace,Menlo,Consolas,monospace;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+pre{white-space:pre-wrap;color:var(--mute);font-size:.85rem}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav a{flex:1;text-align:center;padding:15px 4px;font-weight:600;color:var(--mute);text-decoration:none}
+body[data-view=today] [href="#today"],body[data-view=plan] [href="#plan"],body[data-view=edit] [href="#edit"]{color:var(--acc);box-shadow:inset 0 3px var(--acc)}
+
+/* ===== Focus: large readable view ===== */
+#focus{position:fixed;inset:0;z-index:9;background:var(--bg);display:none;flex-direction:column;--fs:1;padding-top:env(safe-area-inset-top)}
+#focus.open{display:flex}
+#focus header{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+#focus header strong{flex:1;font-size:1.1rem}
+#focus ul{margin:0;overflow:auto;flex:1;padding:8px 18px calc(24px + env(safe-area-inset-bottom));font-size:calc(var(--fs) * 1rem)}
+#focus li label{padding:20px 0;gap:4px 16px}
+#focus li .n{font-size:1.9em;line-height:1.15}
+#focus li .d{font-size:1.6em;color:var(--fg)}
+#focus li .x{font-size:1.2em}
+#focus li input{width:2em;height:2em}
+#focus li:has(input:checked){opacity:.4}
+#focus li.cur{background:color-mix(in srgb,var(--acc) 14%,transparent);margin:0 -18px;padding:0 18px;border-left:6px solid var(--acc)}
+</style>
 </head>
-<body>
-<main id="view"></main>
-<nav id="tabs">
-  <a href="#today" data-tab="today">Today</a>
-  <a href="#plan" data-tab="plan">Plan</a>
-  <a href="#workouts" data-tab="workouts">Workouts</a>
-  <a href="#more" data-tab="more">More</a>
-</nav>
-<div id="focus" hidden></div>
-<dialog id="dlg"></dialog>
-<script src="app.js"></script>
+<body data-view="today">
+<main>
+  <section id="today"></section>
+  <section id="plan"></section>
+  <section id="edit">
+    <h1>Edit</h1>
+    <p class="sub">Plain text: the plan and its weekly schedule first, then your workouts. Tap Save to apply.</p>
+    <textarea id="src" spellcheck="false" autocapitalize="off"></textarea>
+    <div class="row">
+      <button class="pri" id="save">Save</button>
+      <button id="reset">Reset to sample</button>
+      <select id="theme" aria-label="Theme">
+        <option value="">Theme: Auto</option><option>light</option><option>dark</option><option>black</option><option>forest</option><option>sunset</option>
+      </select>
+    </div>
+    <h2>Format</h2>
+    <pre>Plan: My 12-Week Plan
+Start: 2026-10-12     (a Monday)
+Weeks: 12
+
+Mon: Upper Strength    weekly pattern
+Tue: Easy Run + Core   "+" = several workouts
+Sun: Rest
+Week 4 Sat: Rest       override one day of one week
+2026-12-25: Rest       override one date
+
+# Upper Strength       a workout; each line below is a part:
+Bench Press | 4 x 6 | optional note</pre>
+  </section>
+</main>
+<nav><a href="#today">Today</a><a href="#plan">Plan</a><a href="#edit">Edit</a></nav>
+<div id="focus"><header><strong id="ftitle"></strong><button id="fm">A−</button><button id="fp">A+</button><button id="fx">✕</button></header><ul id="flist"></ul></div>
+
+<script>
+const $ = s => document.querySelector(s), DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const store = (k, v) => { try { return v === undefined ? localStorage[k] : localStorage[k] = v } catch (e) {} };
+const iso = d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const add = (s, n) => { const d = new Date(s + 'T12:00'); d.setDate(d.getDate() + n); return iso(d) };
+const esc = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
+const monday = () => { const d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return iso(d) };
+const SEED = () => `Plan: 12-Week Training Plan
+Start: ${monday()}
+Weeks: 12
+
+Mon: Upper Strength
+Tue: Easy Run
+Wed: Lower Strength
+Thu: Intervals
+Fri: Mobility
+Sat: Long Run
+Sun: Rest
+
+# Upper Strength
+Warm-up | 5 min easy cardio + arm circles
+Bench Press | 4 x 6 heavy | Rest 2 min
+Bent-over Row | 4 x 8 | Keep back flat
+Overhead Press | 3 x 8
+Pull-ups | 3 x max
+Cool-down | Stretch chest, lats, shoulders
+
+# Lower Strength
+Warm-up | 5 min bike + leg swings
+Back Squat | 4 x 6 heavy | Rest 2-3 min
+Romanian Deadlift | 3 x 8
+Walking Lunges | 3 x 12 each leg
+Plank | 3 x 45 sec
+
+# Easy Run
+Warm-up walk | 5 min
+Run | 30 min easy, Zone 2 | Conversational pace
+Cool-down walk | 5 min
+
+# Intervals
+Warm-up | 10 min easy jog
+Intervals | 6 x 3 min hard / 2 min easy | Hard = 5k effort
+Cool-down | 10 min easy jog
+
+# Long Run
+Run | 60 min steady | Start slow, bring water
+Stretch | 10 min full body
+
+# Mobility
+Hip openers | 2 x 10 each side
+Thoracic rotations | 2 x 10
+Dead bug | 3 x 10
+Foam roll | 10 min`;
+
+let text = store('text') || SEED(), done = JSON.parse(store('done') || '{}'), P, sched, fkey = null;
+
+function parse(t) {
+  const p = { meta: {}, rules: [], W: {} };
+  let cur;
+  for (let l of t.split('\n')) {
+    l = l.trim();
+    if (!l) continue;
+    if (l[0] == '#') { cur = p.W[l.slice(1).trim().toLowerCase()] = { name: l.slice(1).trim(), parts: [] }; continue }
+    if (cur) { const [n, d, x] = l.split('|').map(s => s.trim()); cur.parts.push({ n, d: d || '', x: x || '' }); continue }
+    const m = l.match(/^([^:]+):\s*(.*)$/); if (!m) continue;
+    const k = m[1].trim().toLowerCase();
+    if (['plan', 'start', 'weeks'].includes(k)) p.meta[k] = m[2]; else p.rules.push([k, m[2]]);
+  }
+  const start = p.meta.start, n = +p.meta.weeks || 12, s = {};
+  const names = v => /^rest$/i.test(v.trim()) ? [] : v.split('+').map(x => x.trim()).filter(Boolean);
+  const kind = k => /^\d{4}-/.test(k) ? 2 : /^week/.test(k) ? 1 : 0;
+  for (const [k, v] of [...p.rules].sort((a, b) => kind(a[0]) - kind(b[0]))) {
+    const m = k.match(/^(?:week\s*(\d+)\s+)?(mon|tue|wed|thu|fri|sat|sun)/), i = m ? DAYS.indexOf(m[2]) : -1;
+    if (kind(k) == 2) s[k] = names(v);
+    else if (i < 0) continue;
+    else if (m[1]) s[add(start, (m[1] - 1) * 7 + i)] = names(v);
+    else for (let w = 0; w < n; w++) s[add(start, w * 7 + i)] = names(v);
+  }
+  return [p, s];
+}
+
+const parts = (date, name) => {
+  const w = P.W[name.toLowerCase()];
+  return w ? w.parts.map((p, i) => { const k = `${date}|${name}|${i}`;
+    return `<li><label><input type="checkbox" data-k="${esc(k)}" ${done[k] ? 'checked' : ''}><span class="n">${esc(p.n)}</span><span class="d">${esc(p.d)}</span>${p.x ? `<span class="x">${esc(p.x)}</span>` : ''}</label></li>`;
+  }).join('') : '';
+};
+const count = (date, name) => { const w = P.W[name.toLowerCase()], n = w ? w.parts.length : 0; let c = 0; for (let i = 0; i < n; i++) c += done[`${date}|${name}|${i}`] ? 1 : 0; return [c, n] };
+const card = (date, name, big) => {
+  const [c, n] = count(date, name), fin = n && c == n;
+  return `<div class="card ${big ? 'now' : ''} ${fin ? 'fin' : ''}"><h3>${esc(name)}<span class="tag ${fin ? 'ok' : ''}">${fin ? 'Done' : n ? c + '/' + n : ''}</span></h3>` +
+    (big ? `<ul>${parts(date, name)}</ul>${n ? `<div class="row"><button class="pri" data-f="${esc(date + '|' + name)}">⛶ Focus</button></div>` : ''}`
+         : `<div class="sub">${P.W[name.toLowerCase()]?.parts.map(p => esc(p.n)).join(' · ') || ''}</div>`) + `</div>`;
+};
+const fmt = (d, o) => new Date(d + 'T12:00').toLocaleDateString(undefined, o || { weekday: 'short', month: 'short', day: 'numeric' });
+
+function render() {
+  const t = iso(new Date()), nx = Object.keys(sched).filter(d => d > t && sched[d].length).sort()[0], ws = sched[t] || [];
+  const wk = Math.floor((new Date(t) - new Date(P.meta.start)) / 6048e5) + 1;
+  $('#today').innerHTML = `<h1>${fmt(t, { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
+    <p class="sub">${esc(P.meta.plan || 'Workout plan')}${wk > 0 && wk <= (+P.meta.weeks || 12) ? ` · Week ${wk}` : ''}</p><h2>Today</h2>` +
+    (ws.length ? ws.map(n => card(t, n, 1)).join('') : '<div class="card empty">Rest day 😌</div>') +
+    (nx ? `<h2>Next · ${fmt(nx)}</h2>` + sched[nx].map(n => card(nx, n)).join('') : '');
+  const ds = Object.keys(sched).sort(), weeks = {};
+  ds.forEach(d => (weeks[Math.floor((new Date(d) - new Date(P.meta.start)) / 6048e5) + 1] ||= []).push(d));
+  $('#plan').innerHTML = `<h1>${esc(P.meta.plan || 'Plan')}</h1><p class="sub">Tap a day to open it in focus view.</p>` +
+    Object.entries(weeks).map(([w, days]) => `<details class="week" ${days.includes(t) || (w == 1 && t < ds[0]) ? 'open' : ''}><summary>Week ${w}</summary>` +
+      days.filter(d => sched[d].length).map(d => { const all = sched[d].every(n => { const [c, m] = count(d, n); return m && c == m });
+        return `<button class="day ${d == t ? 'today' : ''} ${all ? 'fin' : ''}" data-f="${esc(d + '|' + sched[d][0])}"><b>${fmt(d, { weekday: 'short' })}<br><small>${fmt(d, { month: 'numeric', day: 'numeric' })}</small></b><span>${sched[d].map(esc).join(' + ')}${all ? ' ✅' : ''}</span></button>` }).join('') + `</details>`).join('');
+  if (fkey) openFocus(fkey, 1);
+}
+function load(t) {
+  [P, sched] = parse(t);
+  if (!/^\d{4}-\d\d-\d\d$/.test(P.meta.start || '')) throw Error('Add a line like "Start: 2026-10-12"');
+}
+function curMark() {
+  const l = [...$('#flist').children]; l.forEach(x => x.classList.remove('cur'));
+  l.find(x => !x.querySelector('input').checked)?.classList.add('cur');
+}
+function openFocus(key, keep) {
+  fkey = key; const [d, n] = key.split('|');
+  $('#ftitle').textContent = n; $('#focus').classList.add('open');
+  const y = $('#flist').scrollTop; $('#flist').innerHTML = parts(d, n); curMark(); if (keep) $('#flist').scrollTop = y;
+  try { navigator.wakeLock?.request('screen').catch(() => {}) } catch (e) {}
+}
+const fs = d => { const v = Math.min(2.4, Math.max(.7, +(store('fs') || 1) + d)); store('fs', v); $('#focus').style.setProperty('--fs', v) };
+
+document.addEventListener('click', e => {
+  const f = e.target.closest('[data-f]'); if (f) openFocus(f.dataset.f);
+});
+document.addEventListener('change', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  e.target.checked ? done[k] = 1 : delete done[k];
+  store('done', JSON.stringify(done));
+  const fo = fkey; fkey = null; render(); fkey = fo;   // refresh Today/Plan behind the focus view
+  if (fkey) { document.querySelectorAll('#flist input').forEach(i => i.checked = !!done[i.dataset.k]); curMark() }
+});
+$('#fx').onclick = () => { fkey = null; $('#focus').classList.remove('open') };
+$('#fm').onclick = () => fs(-.15); $('#fp').onclick = () => fs(.15);
+$('#save').onclick = () => { try { load($('#src').value); text = $('#src').value; store('text', text); render(); location.hash = '#today' } catch (e) { alert(e.message) } };
+$('#reset').onclick = () => { if (confirm('Replace everything with the sample plan?')) { text = SEED(); store('text', text); done = {}; store('done', '{}'); load(text); $('#src').value = text; render() } };
+$('#theme').onchange = e => { document.documentElement.dataset.theme = e.target.value; store('theme', e.target.value) };
+function route() { const v = location.hash.slice(1); document.body.dataset.view = ['today', 'plan', 'edit'].includes(v) ? v : 'today' }
+addEventListener('hashchange', route);
+document.addEventListener('visibilitychange', () => document.visibilityState == 'visible' && !fkey && render()); // new day after reopening
+
+try { load(text) } catch (e) { text = SEED(); load(text) }
+$('#src').value = text; $('#theme').value = store('theme') || ''; fs(0); route(); render();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
 </body>
 </html>

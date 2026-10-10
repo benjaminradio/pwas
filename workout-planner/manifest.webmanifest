@@ -2,7 +2,7 @@
   "name": "Workout Planner",
   "short_name": "Workouts",
   "description": "Schedule and track your training plan.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
